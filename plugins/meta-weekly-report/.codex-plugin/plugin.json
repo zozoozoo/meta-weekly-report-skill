@@ -1,0 +1,21 @@
+{
+  "name": "meta-weekly-report",
+  "version": "0.2.0",
+  "description": "上传Meta源数据，生成两周清洗表和中文周报。",
+  "author": {
+    "name": "zozoozoo"
+  },
+  "repository": "https://github.com/zozoozoo/meta-weekly-report-skill",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Meta 周报",
+    "shortDescription": "清洗Meta源表并按固定写法分析周度变化",
+    "longDescription": "根据本次上传的Meta源数据生成10张清洗表及中文周报，比较花费、国家、受众、素材类型和素材ID。需要会话代码执行能力。",
+    "developerName": "zozoozoo",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "根据我上传的Meta源表，生成清洗Excel和本周周报。"
+    ]
+  }
+}

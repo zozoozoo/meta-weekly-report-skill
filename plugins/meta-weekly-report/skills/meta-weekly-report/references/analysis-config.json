@@ -1,0 +1,8 @@
+{
+  "minimum_spend_usd": 100,
+  "minimum_spend_share": 0.005,
+  "minimum_orders_per_period": 5,
+  "roas_change": 0.30,
+  "gmv_change_usd": 1000,
+  "note": "用于编辑筛选的初始默认值，不是用户确认的业务达标线，不是统计显著性检验。必须同时检查GMV绝对变化、花费和订单量；可根据规模调整。"
+}

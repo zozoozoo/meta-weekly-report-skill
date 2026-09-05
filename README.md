@@ -1,0 +1,36 @@
+# Meta 周报：ChatGPT 网页版适配
+
+上传最新 Meta XLSX，按固定清洗口径生成10张表，并按既定周例会风格输出中文周报。默认比较最新自然周与上周同星期范围；业务计划等无数据支持的部分留空。
+
+## 本次适配
+
+- `plugins/meta-weekly-report/` 是完整插件，含 `.codex-plugin/plugin.json` 和自包含技能资源。
+- `meta-weekly-report/` 保留独立技能路径，兼容既有 Codex 使用方式。
+- 网页会话可使用 Python 完成清洗、含缓存公式的 Excel、Word 和 Markdown 导出，不依赖用户电脑的 Word 或 Node。
+- 运行依赖是 openpyxl、XlsxWriter、python-docx。插件提供流程与代码，不会赋予会话原本没有的代码执行权限。
+
+## 网页版使用
+
+已经安装并能在技能选择器找到“Meta 周报”时：新建有代码执行能力的对话，上传本周源表，输入 `@` 选择该技能，再发送：
+
+> 根据我上传的 Meta 源表生成清洗 Excel 和本周 Word 周报。沿用技能中的周例会写法，重点说明两周间花费、国家、素材类型、具体素材 ID 的明显变化。
+
+安装尚未完成时：在支持的 ChatGPT Work 创建流程中选择 `@plugin-creator`，提供打包后的 `meta-weekly-report-plugin.zip`，并发送：
+
+> 请检查附件中的 Meta 周报插件，并通过本账号当前支持的插件创建/导入流程配置为可复用插件。插件根目录包含 .codex-plugin/plugin.json，技能位于 skills/meta-weekly-report。目标是在 ChatGPT 网页对话上传 Excel 后生成周报。请确认插件安装后能在新对话选择，并用我随后上传的源表完整试跑。如果本账号只支持公共插件或没有私有导入入口，请明确说明实际限制，不要把读取 ZIP、GitHub 文件或本地安装当作网页版安装成功。
+
+这是一段向实际安装工具发出的请求，不保证每个账号都有私有插件导入权限。能调用 GitHub 连接器不等于能安装 GitHub 仓库中的任意技能。不要把普通对话附件上传当作安装。
+
+若只是先验证业务流程，可以在支持代码执行的对话同时上传插件 ZIP 和源表，明确要求读取包内 SKILL.md、执行配套脚本并生成成品；这是本次对话执行，不是永久安装。后续免重复上传插件需要完成上面的安装。
+
+## 验证状态
+
+使用 AmyAll0831.xlsx 对应的已核对分析数据验证：新旧导出器25,737个数值单元格一致；10张表、15,479个缓存公式、前导零素材编号通过检查。清洗器9项回归测试通过；Word生成包含67段、340个证据数字引用。
+
+尚未在用户 ChatGPT 网页账号内完成安装和实际对话试跑；不宣称已经安装或保证账号权限。新版 Excel 采用便于云端生成的简洁布局，数值口径保持一致。
+
+官方依据：[插件打包](https://developers.openai.com/plugins/build/plugins)、[完整插件测试](https://developers.openai.com/plugins/deploy/connect-chatgpt)。公共目录与本地/仓库市场是不同的分发来源，支持范围依实际界面而定。
+
+## 维护
+
+修改顶层 `meta-weekly-report/` 后运行 `python build_distribution.py`，同步插件副本并生成 `outputs/chatgpt/` 中的两个ZIP。包内不含每周源数据、生成报告或本机运行环境。
