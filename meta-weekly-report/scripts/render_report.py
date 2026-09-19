@@ -15,6 +15,7 @@ TOKEN=re.compile(r'\{\{([^{}]+)\}\}')
 
 def render(analysis,report,out):
     index={dim:{x['key']:x for x in xs} for dim,xs in analysis['comparisons'].items()}
+    index['full_period']={m['key']:m for m in analysis.get('full_period',{}).get('materials',[])}
     refs={}
     for alias,locator in report['refs'].items():
         dim,key=locator.split('::',1);refs[alias]=index[dim][key]

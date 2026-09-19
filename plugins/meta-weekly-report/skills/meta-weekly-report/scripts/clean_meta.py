@@ -102,7 +102,28 @@ def structure(r):
 def metrics(rows):
     sums={k:math.fsum(r[k] for r in rows) for k in BASE}
     for name,a,b in [('roas','gmv','spend'),('aov','gmv','purchases'),('ctr','clicks','impressions'),('atc_rate','atc','lpv'),('cvr','purchases','lpv'),('checkout_rate','checkout','atc'),('payment_rate','purchases','checkout')]:sums[name]=div(sums[a],sums[b])
+    for name,a,b in [('cpm','spend','impressions'),('cpc','spend','clicks'),('cpa','spend','purchases'),('lpv_cost','spend','lpv')]:
+        sums[name]=div(sums[a],sums[b])*(1000 if name=='cpm' else 1)
     return sums
+
+def full_period(rows):
+    """All supplied dates, all IDs. Not lifetime outside this source file."""
+    cfg=json.loads((Path(__file__).parents[1]/'references'/'material-thresholds.json').read_text(encoding='utf-8'))
+    items=list(aggregate(rows,'idkey').values())
+    for m in items:
+        reasons=[]
+        if m['spend']>=cfg['zero_purchase_spend_usd'] and m['purchases']==0:
+            reasons.append(f"累计花费≥${cfg['zero_purchase_spend_usd']:,.0f}且购物次数为0")
+        if m['spend']>=cfg['low_roas_spend_usd'] and m['roas']<cfg['minimum_roas']:
+            reasons.append(f"累计花费≥${cfg['low_roas_spend_usd']:,.0f}且ROAS<{cfg['minimum_roas']}")
+        m['flagged']=bool(reasons);m['status']='不达标' if reasons else '未触发规则'
+        m['flag_reason']='；'.join(reasons)
+    items.sort(key=lambda m:(not m['flagged'],-m['spend'],m['key']))
+    total=metrics(rows)
+    for k in BASE:
+        assert math.isclose(math.fsum(m[k] for m in items),total[k],abs_tol=1e-7),(k,'full_period')
+    return dict(start=min(r['day'] for r in rows).isoformat(),end=max(r['day'] for r in rows).isoformat(),
+                row_count=len(rows),rules=cfg,total=total,materials=items,flagged_count=sum(m['flagged'] for m in items))
 
 def aggregate(rows,dim):
     groups=collections.defaultdict(list)
@@ -225,6 +246,7 @@ def build(path,end=None):
             assert math.isclose(actual,expected,abs_tol=1e-7),(name,'multi_spu',k)
         qa['checks'].append(name+': 总计、互斥维度、剔除项、多SPU乘数核对一致')
     out['qa']=qa
+    out['full_period']=full_period(rows)
     cfg=json.loads((Path(__file__).parents[1]/'references'/'analysis-config.json').read_text(encoding='utf-8'))
     total=metrics(cr)['spend'];threshold=max(cfg['minimum_spend_usd'],total*cfg['minimum_spend_share'])
     signals=[]

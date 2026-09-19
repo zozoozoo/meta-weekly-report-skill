@@ -1,6 +1,6 @@
 interface:
   display_name: "Meta 周报"
-  short_description: "清洗两周Meta源数据，按既定周例会写法生成数据表和变化分析周报"
-  default_prompt: "使用 $meta-weekly-report 处理我上传的Meta源表，按两周周报样例生成清洗Excel和本周周报。"
+  short_description: "生成周度分析、全周期素材低效筛选和有数据依据建议的Meta周报"
+  default_prompt: "使用 $meta-weekly-report 处理我上传的Meta源表，生成周度Excel、全周期素材汇总及本周周报，解释成本和转化变化并提出有依据的建议。"
 policy:
   allow_implicit_invocation: true

@@ -17,8 +17,10 @@
 }
 ```
 
-`refs`必须指向当次`comparisons[维度]`内的key，别名自定；分隔符是第一个`::`。
-每个对象含`current`、`previous`、`delta`、`wow`，基础字段有spend/gmv/purchases/impressions/clicks/lpv/atc/checkout，派生有roas/aov/ctr/atc_rate/cvr/checkout_rate/payment_rate。`label`是显示名。
+周度`refs`指向当次`comparisons[维度]`内的key，全周期引用使用下述full_period入口。别名自定；分隔符是第一个`::`。
+每个对象含`current`、`previous`、`delta`、`wow`，基础字段有spend/gmv/purchases/impressions/clicks/lpv/atc/checkout，派生有roas/aov/ctr/atc_rate/cvr/checkout_rate/payment_rate/cpm/cpc/cpa/lpv_cost。`label`是显示名。成本字段用money格式，分母0不能解释为实际效率。
+
+全周期引用用 `"cumulative": "full_period::归一素材key"`，直接引用 `{{cumulative.spend|money}}`、`{{cumulative.roas|num}}`、`{{cumulative.status}}`，不加current/previous；范围仅源文件全部日期。正文须说明该数字是累计而非本周。
 
 格式：money美元两位小数；num两位小数；int整数；pct带符号百分比；abs_pct绝对百分比；change返回“增长X%/下降X%/持平/新增”；text直接文本。`current.spend|share`和`current.gmv|gmv_share`以别名total同期为分母，必须定义total。
 `wow`为null表示上期0，写作必须依据上下文使用“新增”或无基准，不能让模板自动补出错误因果。

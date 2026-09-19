@@ -15,14 +15,14 @@ for path in source.rglob('*'):
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, dest)
 manifest = {
-    'name': 'meta-weekly-report', 'version': '0.2.0',
-    'description': '上传Meta源数据，生成两周清洗表和中文周报。',
+    'name': 'meta-weekly-report', 'version': '0.3.0',
+    'description': '上传Meta源数据，生成周度分析、全周期素材低效筛选和中文周报。',
     'author': {'name': 'zozoozoo'},
     'repository': 'https://github.com/zozoozoo/meta-weekly-report-skill',
     'skills': './skills/',
     'interface': {
         'displayName': 'Meta 周报', 'shortDescription': '清洗Meta源表并按固定写法分析周度变化',
-        'longDescription': '根据本次上传的Meta源数据生成10张清洗表及中文周报，比较花费、国家、受众、素材类型和素材ID。需要会话代码执行能力。',
+        'longDescription': '生成10张周度清洗表、独立全周期素材汇总和中文周报。解释成本、客单价与转化变化，按累计花费及ROAS筛选低效素材。需要代码执行能力。',
         'developerName': 'zozoozoo', 'category': 'Productivity', 'capabilities': [],
         'defaultPrompt': ['根据我上传的Meta源表，生成清洗Excel和本周周报。']
     }

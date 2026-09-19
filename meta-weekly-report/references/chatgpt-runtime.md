@@ -29,6 +29,8 @@ subprocess.run([sys.executable, str(skill_root/'scripts/export_workbook.py'),
 
 然后读取 analysis.json，按 writing-guide.md 和 report-schema.md 为本次数据撰写 report.json，再运行 render_report.py。不能仅导出数据表就结束，也不能复用上次 report.json。脚本负责准确计算及填数，助手负责阅读变化、选择重点和组织段落。
 
-数字核对：用 openpyxl 的 data_only=True 读最终 Excel，核对两周全店 spend/GMV/ROAS 及正文引用；另用 data_only=False 确认比率为公式。ID 编号须保持文本前导零。
+另外按 full-period.md 运行 export_full_period.py，生成独立的源表全周期素材汇总。每次交付两份Excel，不把累计表代替周度表；阈值只用于累计素材筛选。
+
+数字核对：用 openpyxl 的 data_only=True 读最终 Excel，核对两周全店 spend/GMV/ROAS 及正文引用，以及全周期素材总额与全量源表；另用 data_only=False 确认比率与标记为公式。ID 编号须保持文本前导零。
 
 正文和下载文件均按当次日期命名。提供真实存在、可下载的 Excel、Word 和 Markdown 链接；没有渲染工具时准确说明视觉检查限制。不要把普通附件上传称为技能已安装。

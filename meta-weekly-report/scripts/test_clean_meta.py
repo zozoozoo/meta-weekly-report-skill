@@ -2,13 +2,31 @@
 import datetime as dt, math, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
-from clean_meta import parse_name, products, split_id, id_source, template_id, aggregate, metrics, build, BASE
+from clean_meta import parse_name, products, split_id, id_source, template_id, aggregate, metrics, build, full_period, BASE
 
 def row(cid='p26051452-inspo_2',day='2026-01-05',spend=10,gmv=20,**kw):
     r=parse_name('20260101^cov^cbo','20260101^us^web^eo^int-finance',f'20260101^{cid}^S225BS737_KHAKI+S225BS718_WHITE^sg^img^ugc^adp-shopall')
     r.update({k:0.0 for k in BASE});r.update(spend=spend,gmv=gmv,purchases=2,impressions=100,clicks=8,lpv=4,atc=3,checkout=2,day=dt.date.fromisoformat(day),country='US',currency='USD',account='A',line=2);r.update(kw);return r
 
 class Regression(unittest.TestCase):
+    def test_full_period_threshold_boundaries(self):
+        rs=[row('p0001',spend=199.99,gmv=0,purchases=0),row('p0002',spend=200,gmv=0,purchases=0),
+            row('p0003',spend=1000,gmv=0,purchases=0),row('p0004',spend=1000,gmv=2500,purchases=5),
+            row('p0005',spend=1000,gmv=2499.99,purchases=5),row('p0006',spend=999.99,gmv=100,purchases=1)]
+        a=full_period(rs);d={m['key']:m for m in a['materials']}
+        self.assertEqual([d[f'p000{i}']['flagged'] for i in range(1,7)],[False,True,True,False,True,False])
+        self.assertEqual(len(d['p0003']['flag_reason'].split('；')),2)
+        self.assertEqual(d['p0006']['status'],'未触发规则')
+    def test_full_period_includes_old_rows_and_keeps_versions(self):
+        rs=[row('P0001',day='2026-01-01',spend=700,gmv=1000),row('p0001',day='2026-01-25',spend=400,gmv=1000),row('p0001-ac',spend=10,gmv=50)]
+        a=full_period(rs);d={m['key']:m for m in a['materials']}
+        self.assertEqual(len(d),2);self.assertEqual(d['p0001']['spend'],1100)
+        self.assertAlmostEqual(d['p0001']['roas'],2000/1100);self.assertTrue(d['p0001']['flagged'])
+        self.assertEqual(a['start'],'2026-01-01');self.assertEqual(a['end'],'2026-01-25')
+    def test_cost_metrics_share_denominators(self):
+        m=metrics([row(spend=100,gmv=300,purchases=2,impressions=10000,clicks=100,lpv=80)])
+        self.assertEqual((m['cpm'],m['cpc'],m['cpa'],m['lpv_cost']),(10,1,50,1.25))
+        self.assertAlmostEqual(m['roas'],m['aov']*m['cvr']/m['lpv_cost'])
     def test_station_and_asc_either_position(self):
         for campaign in ['d^asc^cbo','d^cov^asc']:
             r=parse_name(campaign,'d^us^web^eo^lal-1%','d^id^S225BS737^ca^acvid^UGC^adp+best - 广告副本 - 广告副本')
