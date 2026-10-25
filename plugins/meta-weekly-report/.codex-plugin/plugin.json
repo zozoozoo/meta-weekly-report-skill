@@ -1,6 +1,6 @@
 {
   "name": "meta-weekly-report",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "上传Meta源数据，生成周度分析、全周期素材低效筛选和中文周报。",
   "author": {
     "name": "zozoozoo"

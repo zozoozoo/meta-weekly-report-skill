@@ -24,7 +24,7 @@ description: 将Meta源数据清洗为10张周度表及独立全周期素材汇�
 
    支持可选 `--week-end YYYY-MM-DD`。默认以数据最新日期所在自然周为本期，前一周相同星期范围为上期。未满周必须注明部分周，不能声称完整周。两期缺失、缺日期、字段顺序改变或不同币种时，只就实质缺口询问，不猜测。
 3. 读取 `analysis.json` 的 `period`、`qa`、`comparisons` 和 `signals`。原文件可能多于两周，不能拿文件名当日期。核对总计、国家、素材、剔除项、多SPU归因。异常产品仅标记，不能因此丢弃其广告数据。
-4. 网页版 Python 环境执行 `PYTHON scripts/export_workbook.py RUN_DIR/analysis.json OUTPUT.xlsx`；具备 artifact-tool 的环境可继续用 `NODE scripts/export_workbook.mjs RUN_DIR/analysis.json OUTPUT.xlsx NODE_MODULES`。两种方式均生成固定10张表，保留两期、周度对比、公式及计算底数。Python 版同时写入公式缓存，无需 Excel 才能显示结果。使用的表格技能如要求操作标记，则在首次生成前执行。
+4. 网页版 Python 环境执行 `PYTHON scripts/export_workbook.py RUN_DIR/analysis.json OUTPUT.xlsx`；具备 artifact-tool 的环境可继续用 `NODE scripts/export_workbook.mjs RUN_DIR/analysis.json OUTPUT.xlsx NODE_MODULES`。两种方式均生成固定10张表：表2本期和上期采用最新七列花费表，其环比保留在分析数据供正文使用；其他页保留周度对比、公式及计算底数。Python 版同时写入公式缓存，无需 Excel 才能显示结果。使用的表格技能如要求操作标记，则在首次生成前执行。
 5. 按 [full-period.md](references/full-period.md) 另生成独立全周期素材表，使用源文件全部日期，不受周度选择或 --week-end 限制。原有10张表不变。按 writing-guide 和 analysis-writing.md 分析规模、客单价、流量成本及关键转化环节，联系全周期风险，给有数据依据的建议。写 RUN_DIR/report.json，避免只复述涨跌；用户自行补充具体运营操作。
 6. 使用 [report-schema.md](references/report-schema.md) 中的证据占位符填数字，执行：
 
@@ -38,6 +38,7 @@ description: 将Meta源数据清洗为10张周度表及独立全周期素材汇�
 
 - 正文只输出源数据能够支持的板块；“上周重点工作&Todo”“本周计划”“素材需求”保留标题并留空，不反复追问运营信息。
 - 花费及素材汇总段用广告命名中的类型/来源，与表2一致。具体ID用归一ID的全范围汇总，若需要板块内口径则明确读取 `structure_material`。表6/7/9的ID前缀来源是另一字段，不能混用。
+- Slide同时计入video并单列；mpa+img同时计入IMG和mpa。广告形式、素材类型、落地页形式分别解析；v包含普通视频及Slide，s为图片轮播。交叉分类不能加总，SUM只计一次；详细规则见effective-rules.md。
 - 表8达人覆盖全部来源，不能称为合创专属；非ASC只有经实际数据核实全部CBO，才显示CBO/非ASC。
 - 所有比率先汇总分子分母后计算。零分母表内为0，但正文不能把缺分母说成真实效率为0；上期0写新增，不计算无限增长。
 - 两周对比只说明“本周改善/下降”；连续趋势需更多完整周同一范围证据。用户2.5门槛仅用于全周期累计花费达到1000美元的素材筛选，不是周度或全店通用目标。

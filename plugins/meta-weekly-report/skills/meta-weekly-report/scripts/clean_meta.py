@@ -8,12 +8,14 @@ from pathlib import Path
 import openpyxl
 from openpyxl.utils.datetime import from_excel
 
-TYPE_SET = {'img','vid','video','pic','slide','acimg','acvid'}
+TYPE_SET = {'img','vid','video','pic','slide','ac','acimg','acvid'}
+AD_FORMATS = {'sg','mpa','co'}
 BASE = ['spend','gmv','purchases','reach','impressions','clicks','lpv','atc','checkout']
 DEFAULTS = {'S225BS737':'KHAKI','S225BS718':'WHITE','S225TS698':'WHITE','S325JS786':'CREME','S325JS804':'BLACK','S124JS443':'STONE','S124TY863':'BLACK'}
 ALIASES = {'ITALIAN STRAW':'ITLN STRAW','PERIWINKLE BLUE':'PERIWNKLBL','HALOGEN BLUE':'HAL BLUE','LIGHT GRAY':'LT GRAY'}
 SPU = re.compile(r'^([A-Za-z]{1,2}\d{2,3}[A-Za-z]{1,2}\d{3}[A-Za-z]?)(?=$|[_-])')
-STRUCT = ['video-视频','合创','img-图片','ugc-红人素材','ecom-电商图','camp-广告图','catalog-目录','slide-幻灯片','SUM-全店汇总','RMT-再营销','拉新受众','ASC-无受众','非ASC','lal-类似受众','int-兴趣词','ADP','PDP']
+STRUCT = ['video-视频','合创','slide-幻灯片','img-图片','ugc-红人素材','ecom-电商图','camp-广告图','catalog-目录','mpa-轮播','SUM-全店汇总','RMT-再营销','拉新受众','ASC-无受众','非ASC','lal-类似受众','int-兴趣词','ADP','PDP']
+STRUCT_LABELS = {'slide-幻灯片':'Slide-幻灯片','img-图片':'IMG-图片','SUM-全店汇总':'SUM','lal-类似受众':'lal(类似受众)','int-兴趣词':'int（兴趣词）','ADP':'ADP -置顶投放\n产品','PDP':'pdp -落地页是\n产品详情页'}
 TABLES = ['说明_口径','表2_花费结构','表3a_受众大类','表3b_受众明细','表4_国家','表5_落地页','表6_素材ID','表7_图片模板','表8_红人','表9_产品x素材']
 
 def norm(x): return re.sub(r'\s+', ' ', str(x or '').strip()).lower()
@@ -42,8 +44,8 @@ def split_id(value):
 def id_source(value):
     s=norm(value)
     if 'catalog' in s or s=='np': return '其他'
-    m=re.search(r'(?:^|_|-)(ip|h|p|v|u)(?=\d)',s)
-    if m: return {'ip':'IG热帖','h':'合创','p':'图片','v':'视频','u':'ugc'}[m.group(1)]
+    m=re.search(r'(?:^|_|-)(ip|h|p|v|u|s)(?=\d)',s)
+    if m: return {'ip':'IG热帖','h':'合创','p':'图片','v':'视频','u':'ugc','s':'轮播'}[m.group(1)]
     if re.fullmatch(r'[^\d]+?[_\- ]?\d+',s): return '合创'
     return '其他'
 
@@ -72,7 +74,9 @@ def parse_name(campaign,adset,ad):
     cp=str(campaign or '').split('^'); ap=str(adset or '').split('^'); parts=str(ad or '').split('^')
     get=lambda a,i: a[i].strip() if len(a)>i else ''
     cid=get(parts,1) or 'np'; typ=''; source=''; landing=''
-    ti=next((i for i,p in enumerate(parts) if norm(p) in TYPE_SET),None)
+    ti=next((i for i in range(3,len(parts)) if norm(parts[i]) in TYPE_SET),None)
+    # Ad format is independent of material type and landing-page form.
+    ad_format=next((norm(p) for p in parts[3:ti] if norm(p) in AD_FORMATS),'') if ti is not None else ''
     if ti is not None: typ=norm(parts[ti]); source=norm(get(parts,ti+1)); landing=norm(get(parts,ti+2))
     elif 'catalog' in norm(cid): landing=norm(cid)
     landing=re.sub(r'(?:\s*-\s*广告副本)+\s*$','',landing)
@@ -80,16 +84,17 @@ def parse_name(campaign,adset,ad):
     aud=norm(get(ap,4)) or 'np'
     cat=next((b for a,b in [('int','int'),('lal','lal'),('rmt','RMT'),('daba','daba')] if aud.startswith(a)), 'np' if aud=='np' else '其他')
     ps,issues=products(get(parts,2))
-    return dict(cid=cid,idkey=norm(cid),**split_id(cid),id_source=id_source(cid),ad_type=typ,ad_source=source,landing=landing,
+    return dict(cid=cid,idkey=norm(cid),**split_id(cid),id_source=id_source(cid),ad_format=ad_format,ad_type=typ,ad_source=source,landing=landing,
                 form='ADP' if landing.startswith('adp') else 'PDP' if landing.startswith('pdp') else 'Catalog' if 'catalog' in landing else '其他',
                 audience=aud,audience_category=cat,asc=any(norm(get(cp,i))=='asc' for i in (1,2)),budget=norm(get(cp,2)),
                 rmt='dpa' in norm(ad)+' '+norm(campaign),products=ps,product_issues=issues,template=template_id(cid))
 
 def structure(r):
     out=['SUM-全店汇总','RMT-再营销' if r['rmt'] else '拉新受众','ASC-无受众' if r['asc'] else '非ASC']
-    if r['ad_type'] in ('vid','video','acvid'):out.append('video-视频')
+    if r['ad_type'] in ('vid','video','acvid','slide'):out.append('video-视频')
     if r['ad_type'] in ('img','pic','acimg'):out.append('img-图片')
     if r['ad_type']=='slide':out.append('slide-幻灯片')
+    if r.get('ad_format')=='mpa':out.append('mpa-轮播')
     for source,label in [('合创','合创'),('ugc','ugc-红人素材'),('ecom','ecom-电商图'),('camp','camp-广告图')]:
         if r['ad_source']==source:out.append(label)
     if 'catalog' in r['landing']:out.append('catalog-目录')
@@ -205,7 +210,7 @@ def build(path,end=None):
     dims=['structure','audience_category','audience','country','landing','idkey','template','creator','product_material','id_source','products','creator_material','structure_material']
     out=dict(version='1.0',source=dict(filename=path.name,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),row_count=len(rows),first_day=min(dates).isoformat(),last_day=max(dates).isoformat()),
              period=dict(current_start=start.isoformat(),current_end=end.isoformat(),previous_start=prev_start.isoformat(),previous_end=prev_end.isoformat(),complete_week=end.weekday()==6,days=end.weekday()+1),
-             currency=qa['currency'],tables=TABLES,comparisons={})
+             currency=qa['currency'],tables=TABLES,structure_labels=STRUCT_LABELS,comparisons={})
     for dim in dims:
         c,p=aggregate(cr,dim),aggregate(pr,dim);result=[]
         for key in sorted(set(c)|set(p)):

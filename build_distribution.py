@@ -15,7 +15,7 @@ for path in source.rglob('*'):
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, dest)
 manifest = {
-    'name': 'meta-weekly-report', 'version': '0.3.0',
+    'name': 'meta-weekly-report', 'version': '0.4.0',
     'description': '上传Meta源数据，生成周度分析、全周期素材低效筛选和中文周报。',
     'author': {'name': 'zozoozoo'},
     'repository': 'https://github.com/zozoozoo/meta-weekly-report-skill',

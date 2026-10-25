@@ -2,13 +2,52 @@
 import datetime as dt, math, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
-from clean_meta import parse_name, products, split_id, id_source, template_id, aggregate, metrics, build, full_period, BASE
+from clean_meta import parse_name, products, split_id, id_source, template_id, aggregate, metrics, build, full_period, structure, BASE, STRUCT
 
 def row(cid='p26051452-inspo_2',day='2026-01-05',spend=10,gmv=20,**kw):
     r=parse_name('20260101^cov^cbo','20260101^us^web^eo^int-finance',f'20260101^{cid}^S225BS737_KHAKI+S225BS718_WHITE^sg^img^ugc^adp-shopall')
     r.update({k:0.0 for k in BASE});r.update(spend=spend,gmv=gmv,purchases=2,impressions=100,clicks=8,lpv=4,atc=3,checkout=2,day=dt.date.fromisoformat(day),country='US',currency='USD',account='A',line=2);r.update(kw);return r
 
 class Regression(unittest.TestCase):
+    def test_slide_is_video_and_mpa_img_is_image(self):
+        slide=parse_name('', '', 'd^v26100101^np^sg^slide^web^pdp')
+        carousel=parse_name('', '', 'd^s26100102^np^mpa^img^ecom^adp-shop')
+        self.assertEqual((slide['ad_format'],slide['ad_type'],slide['id_source']),('sg','slide','视频'))
+        self.assertTrue({'slide-幻灯片','video-视频'} <= set(structure(slide)))
+        self.assertNotIn('mpa-轮播',structure(slide))
+        self.assertEqual((carousel['ad_format'],carousel['id_source'],carousel['form']),('mpa','轮播','ADP'))
+        self.assertTrue({'mpa-轮播','img-图片'} <= set(structure(carousel)))
+        self.assertNotIn('video-视频',structure(carousel))
+        self.assertEqual(id_source('Creator-s26100102'),'轮播')
+
+    def test_format_type_and_id_are_independent(self):
+        for cid in ('v26100101','s26100101','slide'):
+            r=parse_name('', '', f'd^{cid}^np^sg^video^bts^pdp')
+            self.assertEqual((r['ad_type'],r['ad_source'],r['landing']),('video','bts','pdp'))
+            self.assertNotIn('slide-幻灯片',structure(r))
+            self.assertNotIn('mpa-轮播',structure(r))
+        r=parse_name('', '', 'd^np^np^co^ac^camp^adp-shop')
+        self.assertEqual((r['ad_format'],r['ad_type'],r['ad_source'],r['form']),('co','ac','camp','ADP'))
+        self.assertNotIn('video-视频',structure(r))
+        self.assertNotIn('img-图片',structure(r))
+
+    def test_legacy_names_and_optional_station(self):
+        for middle,expected in [('vid',''),('ca^acvid',''),('mpa^ca^img','mpa'),('ca^mpa^img','mpa')]:
+            r=parse_name('', '', f'd^v26100101^np^{middle}^ugc^pdp')
+            self.assertEqual((r['ad_format'],r['ad_source'],r['landing']),(expected,'ugc','pdp'))
+
+    def test_overlap_sum_and_full_period_carousel(self):
+        rs=[row('v0001',spend=100,gmv=400,ad_type='slide',ad_format='sg'),
+            row('s0002',spend=200,gmv=0,purchases=0,ad_type='img',ad_format='mpa'),
+            row('v0003',spend=300,gmv=300,ad_type='video',ad_format='sg')]
+        d=aggregate(rs,'structure')
+        self.assertEqual(set(d),set(STRUCT))
+        for key,spend in [('video-视频',400),('slide-幻灯片',100),('img-图片',200),('mpa-轮播',200),('SUM-全店汇总',600)]:
+            self.assertEqual(d[key]['spend'],spend)
+        self.assertEqual(d['video-视频']['roas'],700/400)
+        fp={m['key']:m for m in full_period(rs)['materials']}
+        self.assertEqual(fp['s0002']['id_source'],'轮播');self.assertTrue(fp['s0002']['flagged'])
+        self.assertEqual(fp['s0002']['spend'],200)
     def test_full_period_threshold_boundaries(self):
         rs=[row('p0001',spend=199.99,gmv=0,purchases=0),row('p0002',spend=200,gmv=0,purchases=0),
             row('p0003',spend=1000,gmv=0,purchases=0),row('p0004',spend=1000,gmv=2500,purchases=5),
@@ -68,7 +107,7 @@ class Regression(unittest.TestCase):
             self.assertEqual(a['period']['current_start'],'2026-01-12');self.assertTrue(a['period']['complete_week'])
             ids={x['key']:x for x in a['comparisons']['idkey']}
             self.assertIsNone(ids['v26011801']['wow']['roas']);self.assertEqual(ids['u26010501']['current']['spend'],0)
-            self.assertEqual(a['comparisons']['structure'][8]['current']['spend'],27)
+            self.assertEqual(next(x['current']['spend'] for x in a['comparisons']['structure'] if x['key']=='SUM-全店汇总'),27)
     def test_missing_day_not_zero_and_partial_week(self):
         rs=[row(day=(dt.date(2026,1,5)+dt.timedelta(days=i)).isoformat()) for i in range(10)]
         with tempfile.TemporaryDirectory() as td:

@@ -7,6 +7,50 @@ import json
 from pathlib import Path
 import xlsxwriter
 from xlsxwriter.utility import xl_rowcol_to_cell as cell
+from clean_meta import STRUCT_LABELS
+
+
+def write_structure(wb, s, a, xs):
+    """Overlapping breakdowns; each share uses the single source SUM row."""
+    labels = a.get('structure_labels', STRUCT_LABELS)
+    s.set_column(0, 0, 27)
+    s.set_column(1, 5, 17)
+    s.set_column(6, 6, 28)
+    base = dict(font_name='Arial', font_size=11, font_color='#000000',
+                align='center', valign='vcenter', text_wrap=True, border=1)
+    head = wb.add_format(dict(base, bold=True, bg_color='#EDF5C7'))
+    styles = {}
+    for is_sum in (False, True):
+        for kind, nf in [('text',None),('num','#,##0.00'),('roas','0.00'),('pct','0.00%')]:
+            spec = dict(base)
+            if is_sum: spec.update(bg_color='#FFF24B')
+            if nf: spec['num_format'] = nf
+            else: spec['bold'] = True
+            styles[is_sum, kind] = wb.add_format(spec)
+    for p, h in [('current',4), ('previous',len(xs)+8)]:
+        date = f"{a['period'][p+'_start']} 至 {a['period'][p+'_end']}"
+        s.write(h-1, 0, '本期' if p=='current' else '上期')
+        s.merge_range(h-1, 1, h-1, 5, date, head)
+        s.merge_range(h-1, 6, h, 6, '备注', head)
+        s.set_row(h-1, 25); s.set_row(h, 28)
+        for c, label in enumerate(['广告类型','花费','GMV','ROAS','花费占比','GMV占比']):
+            s.write(h,c,label,head)
+        sr = h+1+next(i for i,x in enumerate(xs) if x['key']=='SUM-全店汇总')
+        total = next(x[p] for x in xs if x['key']=='SUM-全店汇总')
+        for i,x in enumerate(xs):
+            r, m = h+1+i, x[p]
+            is_sum = x['key']=='SUM-全店汇总'
+            s.set_row(r, 42 if x['key'] in ('ADP','PDP') else 26)
+            s.write(r,0,labels.get(x['key'],x['label']),styles[is_sum,'text'])
+            s.write(r,1,m['spend'],styles[is_sum,'num'])
+            s.write(r,2,m['gmv'],styles[is_sum,'num'])
+            for c,nc,dr,dc,value,kind in [
+                (3,2,r,1,m['roas'],'roas'),
+                (4,1,sr,1,m['spend']/total['spend'] if total['spend'] else 0,'pct'),
+                (5,2,sr,2,m['gmv']/total['gmv'] if total['gmv'] else 0,'pct')]:
+                numerator, denominator = cell(r,nc), cell(dr,dc,row_abs=True)
+                s.write_formula(r,c,f'=IF({denominator}=0,0,{numerator}/{denominator})',styles[is_sum,kind],value)
+            s.write_blank(r,6,None,styles[is_sum,'text'])
 
 
 def export(a, output):
@@ -55,11 +99,11 @@ def export(a, output):
         ['项目', '说明'], ['源文件', a['source']['filename']],
         ['输入指纹', a['source']['sha256']], ['原始明细数', a['source']['row_count']],
         ['比较方式', '两个完整自然周' if a['period']['complete_week'] else '部分周，与上周相同星期范围比较'],
-        ['阅读方式', '本期、上期及周度对比；两周维度并集。右侧保留比率计算底数。'],
+        ['阅读方式', '表2按七列展示本期、上期；环比保留在分析数据供正文使用。其他页保留周度对比与计算底数；两周维度并集。'],
         ['比率', 'ROAS=GMV/花费；客单价=GMV/购物次数；CTR=点击/展示；加购率=加购/LPV；转化率=购物次数/LPV。先汇总再相除。'],
         ['零分母', '表内取0，正文不解释为真实零效率；上期0的环比显示新增或-。'],
         ['素材来源', '表2与正文类型分组使用广告命名；表6/7/9使用ID前缀来源，不混用。'],
-        ['重叠归因', '表2各类交叉，只有SUM是全店总计；多SPU每个产品全额归因，表9不可加总成全店或真实单品销售。'],
+        ['重叠归因', 'Slide同时计入video；mpa+img同时计入IMG与mpa。表2各类交叉，只有SUM是全店总计；多SPU全额归因，表9不可加总成全店或真实单品销售。'],
         ['达人', '表8涵盖全部来源，无名排除，并非仅合创。'],
         ['非ASC预算类别', '、'.join(a['qa']['nonasc_budget_spend'])],
         ['事件比值', '结账率=结账发起/加购；支付率=购物次数/结账发起。非同用户队列，超过100%不作流失判断。'],
@@ -80,15 +124,15 @@ def export(a, output):
     for name, dim in zip(a['tables'][1:], dims):
         s = sheet(name)
         xs = a['comparisons'][dim]
+        if dim == 'structure':
+            write_structure(wb, s, a, xs)
+            continue
         labels = {'idkey': ['素材ID', '达人名', '类型', '编号', '后缀', '素材来源', '需复核'], 'landing': ['落地页', '形式'], 'product_material': ['SPU+Color', '素材ID', '素材来源']}.get(dim, ['分类'])
         keys = ['spend', 'gmv', 'purchases', 'roas', 'aov', 'ctr', 'atc_rate', 'cvr']
         heads = ['花费', 'GMV', '购物次数', 'ROAS', '客单价', '链接点击率', '加购率', '转化率']
         if dim == 'product_material':
             keys, heads = keys[:5]+['cvr'], heads[:5]+['转化率']
-        structure = dim == 'structure'
-        if structure:
-            headers = ['分类', '花费', '花费环比', 'GMV', 'GMV环比', 'ROAS', 'ROAS环比', '花费占比', 'GMV占比']
-        else: headers = labels + heads
+        headers = labels + heads
         n, j = len(xs), len(labels)
         starts = {'current': 4, 'previous': n+8}
         if not n:
@@ -99,22 +143,11 @@ def export(a, output):
             s.write(h-1, 0, '本期' if p == 'current' else '上期')
             row(s, h, headers, True)
             hc = len(headers)+2
-            if not structure:
-                for k, label in enumerate(['链接点击量', '展示次数', 'LPV', 'ATC', '结账发起', '结账率', '支付率']): s.write(h, hc+k, label, fmt(bold=True))
+            for k, label in enumerate(['链接点击量', '展示次数', 'LPV', 'ATC', '结账发起', '结账率', '支付率']): s.write(h, hc+k, label, fmt(bold=True))
             for i, x in enumerate(xs):
                 r, pr = h+1+i, starts['previous']+1+i
                 m = x[p]
                 meta = m if m.get('rows') else (x['current'] if x['current'].get('rows') else x['previous'])
-                if structure:
-                    row(s, r, [x['label'], m['spend'], None, m['gmv']])
-                    s.write(r, 1, m['spend'], fmt('money')); s.write(r, 3, m['gmv'], fmt('money'))
-                    ratio(s, r, 5, r, 3, r, 1, m['roas'], 'num')
-                    for c, src, key in [(2,1,'spend'), (4,3,'gmv'), (6,5,'roas')]:
-                        if p == 'current': wow(s,r,c,r,src,pr,src,m[key],x['previous'][key])
-                        else: s.write(r,c,'-',fmt())
-                    sr = h+1+next(k for k,y in enumerate(xs) if y['key']=='SUM-全店汇总')
-                    for c, src, key in [(7,1,'spend'),(8,3,'gmv')]: ratio(s,r,c,r,src,sr,src,m[key]/total[p][key] if total[p][key] else 0)
-                    continue
                 ids = [meta['label']]
                 if dim == 'idkey': ids = [meta[k] for k in ['label','creator','type','number','suffix','id_source','review']]
                 if dim == 'landing': ids = [x['label'],meta['form']]
@@ -127,15 +160,14 @@ def export(a, output):
                 for c,nc,dc,key in pairs: ratio(s,r,c,r,nc,r,dc,m[key])
                 ratio(s,r,hc+5,r,hc+4,r,hc+3,m['checkout']/m['atc'] if m['atc'] else 0)
                 ratio(s,r,hc+6,r,j+2,r,hc+4,m['purchases']/m['checkout'] if m['checkout'] else 0)
-        if not structure:
-            h = 2*n+12
-            row(s,h,['维度','本期花费','上期花费','花费环比','本期GMV','上期GMV','GMV环比','本期ROAS','上期ROAS','ROAS环比','GMV增减额'],True)
-            for i,x in enumerate(xs):
-                r, cr, pr = h+1+i, starts['current']+1+i, starts['previous']+1+i
-                row(s,r,[x['key'] if dim=='product_material' else x['label']])
-                for c,rr,cc,key,p,kind in [(1,cr,j,'spend','current','money'),(2,pr,j,'spend','previous','money'),(4,cr,j+1,'gmv','current','money'),(5,pr,j+1,'gmv','previous','money'),(7,cr,j+3,'roas','current','num'),(8,pr,j+3,'roas','previous','num')]: formula(s,r,c,'='+cell(rr,cc),x[p][key],kind)
-                for c,cc,pc,key in [(3,1,2,'spend'),(6,4,5,'gmv'),(9,7,8,'roas')]: wow(s,r,c,r,cc,r,pc,x['current'][key],x['previous'][key])
-                formula(s,r,10,f'={cell(r,4)}-{cell(r,5)}',x['delta']['gmv'],'money')
+        h = 2*n+12
+        row(s,h,['维度','本期花费','上期花费','花费环比','本期GMV','上期GMV','GMV环比','本期ROAS','上期ROAS','ROAS环比','GMV增减额'],True)
+        for i,x in enumerate(xs):
+            r, cr, pr = h+1+i, starts['current']+1+i, starts['previous']+1+i
+            row(s,r,[x['key'] if dim=='product_material' else x['label']])
+            for c,rr,cc,key,p,kind in [(1,cr,j,'spend','current','money'),(2,pr,j,'spend','previous','money'),(4,cr,j+1,'gmv','current','money'),(5,pr,j+1,'gmv','previous','money'),(7,cr,j+3,'roas','current','num'),(8,pr,j+3,'roas','previous','num')]: formula(s,r,c,'='+cell(rr,cc),x[p][key],kind)
+            for c,cc,pc,key in [(3,1,2,'spend'),(6,4,5,'gmv'),(9,7,8,'roas')]: wow(s,r,c,r,cc,r,pc,x['current'][key],x['previous'][key])
+            formula(s,r,10,f'={cell(r,4)}-{cell(r,5)}',x['delta']['gmv'],'money')
         if dim in ('idkey','product_material'): s.set_column(1,1,35)
     wb.close()
     return output
